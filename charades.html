@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Charades Game</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            text-align: center;
+            padding: 20px;
+            max-width: 800px;
+            width: 100%;
+        }
+
+        .screen {
+            display: none;
+            animation: fadeIn 0.5s ease-in;
+        }
+
+        .screen.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .setup-screen h1 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+
+        .form-group label {
+            display: block;
+            font-size: 1.2rem;
+            margin-bottom: 0.5rem;
+        }
+
+        textarea {
+            width: 100%;
+            height: 200px;
+            padding: 15px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            resize: vertical;
+        }
+
+        input[type="number"] {
+            padding: 15px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 10px;
+            width: 150px;
+        }
+
+        button {
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.2rem;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 10px;
+        }
+
+        button:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(255,107,107,0.4);
+        }
+
+        .game-screen h2 {
+            font-size: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .phrase-display {
+            font-size: 4rem;
+            font-weight: bold;
+            margin: 2rem 0;
+            padding: 2rem;
+            background: rgba(255,255,255,0.1);
+            border-radius: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+            min-height: 200px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .game-info {
+            display: flex;
+            justify-content: space-around;
+            margin: 2rem 0;
+            font-size: 1.5rem;
+        }
+
+        .controls {
+            margin-top: 2rem;
+        }
+
+        .key-hint {
+            font-size: 1rem;
+            color: rgba(255,255,255,0.8);
+            margin-top: 1rem;
+        }
+
+        .end-screen h2 {
+            font-size: 3rem;
+            margin-bottom: 2rem;
+        }
+
+        .score {
+            font-size: 2.5rem;
+            margin: 2rem 0;
+            color: #4caf50;
+        }
+
+        .timer {
+            color: #ffeb3b;
+        }
+
+        .timer.warning {
+            color: #ff5722;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 768px) {
+            .phrase-display {
+                font-size: 2.5rem;
+            }
+            
+            .setup-screen h1 {
+                font-size: 2rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Setup Screen -->
+        <div class="screen setup-screen active" id="setupScreen">
+            <h1>🎭 Charades Game</h1>
+            
+            <div class="form-group">
+                <label for="phrasesInput">Enter phrases (one per line):</label>
+                <textarea id="phrasesInput" placeholder="Movie titles&#10;Song names&#10;Book titles&#10;Famous people&#10;Actions"></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="timerInput">Time limit (seconds):</label>
+                <input type="number" id="timerInput" value="60" min="10" max="300">
+            </div>
+            
+            <button onclick="startGame()">Start Game</button>
+        </div>
+
+        <!-- Game Screen -->
+        <div class="screen game-screen" id="gameScreen">
+            <div class="game-info">
+                <div>Score: <span id="scoreDisplay">0</span></div>
+                <div class="timer">Time: <span id="timerDisplay">60</span>s</div>
+            </div>
+            
+            <div class="phrase-display" id="phraseDisplay">
+                Ready to play!
+            </div>
+            
+            <div class="controls">
+                <button onclick="correctAnswer()">Correct! ✓</button>
+                <button onclick="skipPhrase()">Skip ⏭</button>
+            </div>
+            
+            <div class="key-hint">
+                Press SPACE for Correct | Press S for Skip | Press ESC to end game
+            </div>
+        </div>
+
+        <!-- End Screen -->
+        <div class="screen end-screen" id="endScreen">
+            <h2>🎉 Game Over!</h2>
+            <div class="score">Final Score: <span id="finalScore">0</span></div>
+            <button onclick="backToSetup()">Play Again</button>
+        </div>
+    </div>
+
+    <script>
+        let phrases = [];
+        let currentPhrases = [];
+        let timeLimit = 60;
+        let currentTime = 60;
+        let score = 0;
+        let gameTimer = null;
+
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(screen => {
+                screen.classList.remove('active');
+            });
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        function startGame() {
+            const phrasesInput = document.getElementById('phrasesInput').value.trim();
+            const timerInput = parseInt(document.getElementById('timerInput').value);
+
+            if (!phrasesInput) {
+                alert('Please enter some phrases!');
+                return;
+            }
+
+            phrases = phrasesInput.split('\n').map(phrase => phrase.trim()).filter(phrase => phrase);
+            
+            if (phrases.length === 0) {
+                alert('Please enter valid phrases!');
+                return;
+            }
+
+            timeLimit = timerInput;
+            currentTime = timeLimit;
+            score = 0;
+            currentPhrases = [...phrases];
+
+            document.getElementById('scoreDisplay').textContent = score;
+            document.getElementById('timerDisplay').textContent = currentTime;
+
+            showScreen('gameScreen');
+            showNextPhrase();
+            startTimer();
+        }
+
+        function showNextPhrase() {
+            if (currentPhrases.length === 0) {
+                endGame();
+                return;
+            }
+
+            const randomIndex = Math.floor(Math.random() * currentPhrases.length);
+            const selectedPhrase = currentPhrases[randomIndex];
+            
+            document.getElementById('phraseDisplay').textContent = selectedPhrase;
+            currentPhrases.splice(randomIndex, 1);
+        }
+
+        function startTimer() {
+            const timerDisplay = document.getElementById('timerDisplay');
+            
+            gameTimer = setInterval(() => {
+                currentTime--;
+                timerDisplay.textContent = currentTime;
+                
+                if (currentTime <= 10) {
+                    timerDisplay.parentElement.classList.add('warning');
+                } else {
+                    timerDisplay.parentElement.classList.remove('warning');
+                }
+                
+                if (currentTime <= 0) {
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function correctAnswer() {
+            score++;
+            document.getElementById('scoreDisplay').textContent = score;
+            showNextPhrase();
+        }
+
+        function skipPhrase() {
+            showNextPhrase();
+        }
+
+        function endGame() {
+            if (gameTimer) {
+                clearInterval(gameTimer);
+                gameTimer = null;
+            }
+            
+            document.getElementById('finalScore').textContent = score;
+            showScreen('endScreen');
+        }
+
+        function backToSetup() {
+            document.getElementById('timerDisplay').parentElement.classList.remove('warning');
+            showScreen('setupScreen');
+        }
+
+        // Keyboard controls
+        document.addEventListener('keydown', (event) => {
+            if (document.getElementById('gameScreen').classList.contains('active')) {
+                switch(event.key) {
+                    case ' ':
+                        event.preventDefault();
+                        correctAnswer();
+                        break;
+                    case 's':
+                    case 'S':
+                        event.preventDefault();
+                        skipPhrase();
+                        break;
+                    case 'Escape':
+                        event.preventDefault();
+                        endGame();
+                        break;
+                }
+            }
+        });
+
+        // Prevent spacebar from scrolling page
+        document.addEventListener('keydown', (event) => {
+            if (event.key === ' ') {
+                event.preventDefault();
+            }
+        });
+    </script>
+</body>
+</html>
+
